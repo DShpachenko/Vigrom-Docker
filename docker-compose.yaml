@@ -1,0 +1,52 @@
+version: '3.1'
+
+services:
+  billing-app:
+    depends_on:
+      - billing-postgres
+      - billing-redis
+    build:
+      context: .
+      dockerfile: ./docker/billing.docker
+    volumes:
+      - ./apps/billing/:/var/www/billing/
+      - ~/.ssh/id_rsa:/root/.ssh/id_rsa
+    networks:
+      vigrom-net:
+        ipv4_address: ${DOCKER_BILLING_APP}
+
+  billing-postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: ${BILLING_PGSQL_DB_USERNAME}
+      POSTGRES_PASSWORD: ${BILLING_PGSQL_DB_PASSWORD}
+      POSTGRES_DB: ${BILLING_PGSQL_DB_DATABASE}
+    networks:
+      vigrom-net:
+        ipv4_address: ${DOCKER_BILLING_PGSQL}
+
+  billing-redis:
+    image: redis:latest
+    tty: true
+    networks:
+      vigrom-net:
+        ipv4_address: ${DOCKER_BILLING_REDIS}
+
+  billing-nginx:
+    image: nginx:latest
+    depends_on:
+      - billing-app
+    volumes:
+      - ./apps/billing/:/var/www/billing
+      - ./nginx/billing.nginx.conf:/etc/nginx/conf.d/nginx.conf
+      - ./nginx/laravel-worker.conf:/etc/supervisor/conf.d/laravel-worker.conf
+    command: [nginx-debug, '-g', 'daemon off;']
+    networks:
+      vigrom-net:
+        ipv4_address: ${DOCKER_BILLING_NGINX}
+
+networks:
+  vigrom-net:
+    ipam:
+      config:
+        - subnet: ${DOCKER_SUBNET}
